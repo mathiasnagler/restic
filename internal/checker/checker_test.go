@@ -195,19 +195,16 @@ func TestModifiedIndex(t *testing.T) {
 		Type: restic.IndexFile,
 		Name: "90f838b4ac28735fda8644fe6a08dbc742e57aaf81b30977b4fefa357010eafd",
 	}
-	f, err := repo.Backend().Load(context.TODO(), h, 0, 0)
+	err := repo.Backend().Load(context.TODO(), h, 0, 0, func(rd io.Reader) (err error) {
+		// save the index again with a modified name so that the hash doesn't match
+		// the content any more
+		h2 := restic.Handle{
+			Type: restic.IndexFile,
+			Name: "80f838b4ac28735fda8644fe6a08dbc742e57aaf81b30977b4fefa357010eafd",
+		}
+		return repo.Backend().Save(context.TODO(), h2, rd)
+	})
 	test.OK(t, err)
-
-	// save the index again with a modified name so that the hash doesn't match
-	// the content any more
-	h2 := restic.Handle{
-		Type: restic.IndexFile,
-		Name: "80f838b4ac28735fda8644fe6a08dbc742e57aaf81b30977b4fefa357010eafd",
-	}
-	err = repo.Backend().Save(context.TODO(), h2, f)
-	test.OK(t, err)
-
-	test.OK(t, f.Close())
 
 	chkr := checker.New(repo)
 	hints, errs := chkr.LoadIndex(context.TODO())
@@ -262,17 +259,13 @@ type errorBackend struct {
 	ProduceErrors bool
 }
 
-func (b errorBackend) Load(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
-	rd, err := b.Backend.Load(ctx, h, length, offset)
-	if err != nil {
-		return rd, err
-	}
-
-	if b.ProduceErrors {
-		return errorReadCloser{rd}, err
-	}
-
-	return rd, nil
+func (b errorBackend) Load(ctx context.Context, h restic.Handle, length int, offset int64, consumer func(rd io.Reader) error) error {
+	return b.Backend.Load(ctx, h, length, offset, func(rd io.Reader) (err error) {
+		if b.ProduceErrors {
+			return err
+		}
+		return consumer(rd)
+	})
 }
 
 type errorReadCloser struct {

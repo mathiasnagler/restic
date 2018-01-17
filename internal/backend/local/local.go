@@ -18,6 +18,7 @@ import (
 type Local struct {
 	Config
 	backend.Layout
+	restic.DefaultLoaderBackend
 }
 
 // ensure statically that *Local implements restic.Backend.
@@ -52,7 +53,9 @@ func Open(cfg Config) (*Local, error) {
 		return nil, err
 	}
 
-	return &Local{Config: cfg, Layout: l}, nil
+	be := &Local{Config: cfg, Layout: l}
+	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
+	return be, nil
 }
 
 // Create creates all the necessary files and directories for a new local
@@ -69,6 +72,7 @@ func Create(cfg Config) (*Local, error) {
 		Config: cfg,
 		Layout: l,
 	}
+	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 
 	// test if config file already exists
 	_, err = fs.Lstat(be.Filename(restic.Handle{Type: restic.ConfigFile}))
@@ -146,10 +150,10 @@ func (b *Local) Save(ctx context.Context, h restic.Handle, rd io.Reader) error {
 	return setNewFileMode(filename, backend.Modes.File)
 }
 
-// Load returns a reader that yields the contents of the file at h at the
+// OpenReader returns a reader that yields the contents of the file at h at the
 // given offset. If length is nonzero, only a portion of the file is
 // returned. rd must be closed after use.
-func (b *Local) Load(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+func (b *Local) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	debug.Log("Load %v, length %v, offset %v", h, length, offset)
 	if err := h.Valid(); err != nil {
 		return nil, err

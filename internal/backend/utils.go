@@ -10,24 +10,11 @@ import (
 
 // LoadAll reads all data stored in the backend for the handle.
 func LoadAll(ctx context.Context, be restic.Backend, h restic.Handle) (buf []byte, err error) {
-	rd, err := be.Load(ctx, h, 0, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		_, e := io.Copy(ioutil.Discard, rd)
-		if err == nil {
-			err = e
-		}
-
-		e = rd.Close()
-		if err == nil {
-			err = e
-		}
-	}()
-
-	return ioutil.ReadAll(rd)
+	err = be.Load(ctx, h, 0, 0, func(rd io.Reader) error {
+		buf, err = ioutil.ReadAll(rd)
+		return err
+	})
+	return buf, err
 }
 
 // LimitedReadCloser wraps io.LimitedReader and exposes the Close() method.

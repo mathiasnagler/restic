@@ -26,6 +26,7 @@ type Backend struct {
 	sem    *backend.Semaphore
 	cfg    Config
 	backend.Layout
+	restic.DefaultLoaderBackend
 }
 
 // make sure that *Backend implements backend.Backend
@@ -77,6 +78,7 @@ func open(cfg Config, rt http.RoundTripper) (*Backend, error) {
 		sem:    sem,
 		cfg:    cfg,
 	}
+	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 
 	client.SetCustomTransport(rt)
 
@@ -281,10 +283,10 @@ func (wr wrapReader) Close() error {
 	return err
 }
 
-// Load returns a reader that yields the contents of the file at h at the
+// OpenReader returns a reader that yields the contents of the file at h at the
 // given offset. If length is nonzero, only a portion of the file is
 // returned. rd must be closed after use.
-func (be *Backend) Load(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+func (be *Backend) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	debug.Log("Load %v, length %v, offset %v from %v", h, length, offset, be.Filename(h))
 	if err := h.Valid(); err != nil {
 		return nil, err

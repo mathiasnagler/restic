@@ -630,14 +630,8 @@ func checkPack(ctx context.Context, r restic.Repository, id restic.ID) error {
 	debug.Log("checking pack %v", id)
 	h := restic.Handle{Type: restic.DataFile, Name: id.String()}
 
-	rd, err := r.Backend().Load(ctx, h, 0, 0)
-	if err != nil {
-		return err
-	}
-
 	packfile, err := fs.TempFile("", "restic-temp-check-")
 	if err != nil {
-		_ = rd.Close()
 		return errors.Wrap(err, "TempFile")
 	}
 
@@ -646,18 +640,25 @@ func checkPack(ctx context.Context, r restic.Repository, id restic.ID) error {
 		_ = os.Remove(packfile.Name())
 	}()
 
-	hrd := hashing.NewReader(rd, sha256.New())
-	size, err := io.Copy(packfile, hrd)
-	if err != nil {
-		_ = rd.Close()
-		return errors.Wrap(err, "Copy")
-	}
-
-	if err = rd.Close(); err != nil {
+	var hash restic.ID
+	var size int64
+	err = r.Backend().Load(ctx, h, 0, 0, func(rd io.Reader) (err error) {
+		_, err = packfile.Seek(0, io.SeekStart)
+		if err == nil {
+			err = packfile.Truncate(0)
+		}
+		if err != nil {
+			return err
+		}
+		hrd := hashing.NewReader(rd, sha256.New())
+		size, err = io.Copy(packfile, hrd)
+		hash = restic.IDFromHash(hrd.Sum(nil))
 		return err
+	})
+	if err != nil {
+		return errors.Wrap(err, "checkPack")
 	}
 
-	hash := restic.IDFromHash(hrd.Sum(nil))
 	debug.Log("hash for pack %v is %v", id, hash)
 
 	if !hash.Equal(id) {

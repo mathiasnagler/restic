@@ -30,6 +30,7 @@ type SFTP struct {
 
 	backend.Layout
 	Config
+	restic.DefaultLoaderBackend
 }
 
 var _ restic.Backend = &SFTP{}
@@ -89,7 +90,9 @@ func startClient(program string, args ...string) (*SFTP, error) {
 		return nil, errors.Wrap(err, "bg")
 	}
 
-	return &SFTP{c: client, cmd: cmd, result: ch}, nil
+	be := &SFTP{c: client, cmd: cmd, result: ch}
+	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
+	return be, nil
 }
 
 // clientError returns an error if the client has exited. Otherwise, nil is
@@ -327,10 +330,10 @@ func (r *SFTP) Save(ctx context.Context, h restic.Handle, rd io.Reader) (err err
 	return errors.Wrap(r.c.Chmod(filename, backend.Modes.File), "Chmod")
 }
 
-// Load returns a reader that yields the contents of the file at h at the
+// OpenReader returns a reader that yields the contents of the file at h at the
 // given offset. If length is nonzero, only a portion of the file is
 // returned. rd must be closed after use.
-func (r *SFTP) Load(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+func (r *SFTP) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	debug.Log("Load %v, length %v, offset %v", h, length, offset)
 	if err := h.Valid(); err != nil {
 		return nil, err
