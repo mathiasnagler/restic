@@ -10,9 +10,9 @@ import (
 
 // LoadAll reads all data stored in the backend for the handle.
 func LoadAll(ctx context.Context, be restic.Backend, h restic.Handle) (buf []byte, err error) {
-	err = be.Load(ctx, h, 0, 0, func(rd io.Reader) error {
-		buf, err = ioutil.ReadAll(rd)
-		return err
+	err = be.Load(ctx, h, 0, 0, func(rd io.Reader) (ierr error) {
+		buf, ierr = ioutil.ReadAll(rd)
+		return ierr
 	})
 	return buf, err
 }

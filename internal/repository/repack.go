@@ -35,18 +35,18 @@ func Repack(ctx context.Context, repo restic.Repository, packs restic.IDSet, kee
 		// TODO very similar code in checker, consider moving to utils.go
 		var hash restic.ID
 		var packLength int64
-		err = repo.Backend().Load(ctx, h, 0, 0, func(rd io.Reader) (err error) {
-			_, err = tempfile.Seek(0, io.SeekStart)
-			if err == nil {
-				err = tempfile.Truncate(0)
+		err = repo.Backend().Load(ctx, h, 0, 0, func(rd io.Reader) (ierr error) {
+			_, ierr = tempfile.Seek(0, io.SeekStart)
+			if ierr == nil {
+				ierr = tempfile.Truncate(0)
 			}
-			if err != nil {
-				return err
+			if ierr != nil {
+				return ierr
 			}
 			hrd := hashing.NewReader(rd, sha256.New())
-			packLength, err = io.Copy(tempfile, hrd)
+			packLength, ierr = io.Copy(tempfile, hrd)
 			hash = restic.IDFromHash(hrd.Sum(nil))
-			return err
+			return ierr
 		})
 		if err != nil {
 			return nil, errors.Wrap(err, "Repack")

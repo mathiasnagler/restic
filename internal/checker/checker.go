@@ -642,18 +642,18 @@ func checkPack(ctx context.Context, r restic.Repository, id restic.ID) error {
 
 	var hash restic.ID
 	var size int64
-	err = r.Backend().Load(ctx, h, 0, 0, func(rd io.Reader) (err error) {
-		_, err = packfile.Seek(0, io.SeekStart)
-		if err == nil {
-			err = packfile.Truncate(0)
+	err = r.Backend().Load(ctx, h, 0, 0, func(rd io.Reader) (ierr error) {
+		_, ierr = packfile.Seek(0, io.SeekStart)
+		if ierr == nil {
+			ierr = packfile.Truncate(0)
 		}
-		if err != nil {
-			return err
+		if ierr != nil {
+			return ierr
 		}
 		hrd := hashing.NewReader(rd, sha256.New())
-		size, err = io.Copy(packfile, hrd)
+		size, ierr = io.Copy(packfile, hrd)
 		hash = restic.IDFromHash(hrd.Sum(nil))
-		return err
+		return ierr
 	})
 	if err != nil {
 		return errors.Wrap(err, "checkPack")

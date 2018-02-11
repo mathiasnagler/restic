@@ -26,10 +26,10 @@ func ReaderAt(be Backend, h Handle) io.ReaderAt {
 func ReadAt(ctx context.Context, be Backend, h Handle, offset int64, p []byte) (n int, err error) {
 	debug.Log("ReadAt(%v) at %v, len %v", h, offset, len(p))
 
-	err = be.Load(ctx, h, len(p), offset, func(rd io.Reader) error {
-		n, err = io.ReadFull(rd, p)
+	err = be.Load(ctx, h, len(p), offset, func(rd io.Reader) (ierr error) {
+		n, ierr = io.ReadFull(rd, p)
 
-		return err
+		return ierr
 	})
 	if err != nil {
 		return 0, err

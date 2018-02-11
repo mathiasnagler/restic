@@ -195,7 +195,7 @@ func TestModifiedIndex(t *testing.T) {
 		Type: restic.IndexFile,
 		Name: "90f838b4ac28735fda8644fe6a08dbc742e57aaf81b30977b4fefa357010eafd",
 	}
-	err := repo.Backend().Load(context.TODO(), h, 0, 0, func(rd io.Reader) (err error) {
+	err := repo.Backend().Load(context.TODO(), h, 0, 0, func(rd io.Reader) error {
 		// save the index again with a modified name so that the hash doesn't match
 		// the content any more
 		h2 := restic.Handle{
@@ -260,28 +260,24 @@ type errorBackend struct {
 }
 
 func (b errorBackend) Load(ctx context.Context, h restic.Handle, length int, offset int64, consumer func(rd io.Reader) error) error {
-	return b.Backend.Load(ctx, h, length, offset, func(rd io.Reader) (err error) {
+	return b.Backend.Load(ctx, h, length, offset, func(rd io.Reader) error {
 		if b.ProduceErrors {
-			return err
+			return consumer(errorReadCloser{rd})
 		}
 		return consumer(rd)
 	})
 }
 
 type errorReadCloser struct {
-	io.ReadCloser
+	io.Reader
 }
 
 func (erd errorReadCloser) Read(p []byte) (int, error) {
-	n, err := erd.ReadCloser.Read(p)
+	n, err := erd.Reader.Read(p)
 	if n > 0 {
 		induceError(p[:n])
 	}
 	return n, err
-}
-
-func (erd errorReadCloser) Close() error {
-	return erd.ReadCloser.Close()
 }
 
 // induceError flips a bit in the slice.

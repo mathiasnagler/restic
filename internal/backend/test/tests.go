@@ -174,9 +174,9 @@ func (s *Suite) TestLoad(t *testing.T) {
 		}
 
 		var buf []byte
-		err := b.Load(context.TODO(), handle, getlen, int64(o), func(rd io.Reader) (err error) {
-			buf, err = ioutil.ReadAll(rd)
-			return err
+		err := b.Load(context.TODO(), handle, getlen, int64(o), func(rd io.Reader) (ierr error) {
+			buf, ierr = ioutil.ReadAll(rd)
+			return ierr
 		})
 		if err != nil {
 			t.Logf("Load, l %v, o %v, len(d) %v, getlen %v", l, o, len(d), getlen)
@@ -619,9 +619,9 @@ func store(t testing.TB, b restic.Backend, tpe restic.FileType, data []byte) res
 
 // testLoad loads a blob (but discards its contents).
 func testLoad(b restic.Backend, h restic.Handle, length int, offset int64) error {
-	return b.Load(context.TODO(), h, 0, 0, func(rd io.Reader) (err error) {
-		_, err = io.Copy(ioutil.Discard, rd)
-		return err
+	return b.Load(context.TODO(), h, 0, 0, func(rd io.Reader) (ierr error) {
+		_, ierr = io.Copy(ioutil.Discard, rd)
+		return ierr
 	})
 }
 
@@ -742,9 +742,9 @@ func (s *Suite) TestBackend(t *testing.T) {
 
 			buf2 := make([]byte, length)
 			var n int
-			err = b.Load(context.TODO(), h, len(buf2), int64(start), func(rd io.Reader) (err error) {
-				n, err = io.ReadFull(rd, buf2)
-				return err
+			err = b.Load(context.TODO(), h, len(buf2), int64(start), func(rd io.Reader) (ierr error) {
+				n, ierr = io.ReadFull(rd, buf2)
+				return ierr
 			})
 			test.OK(t, err)
 			test.OK(t, err)

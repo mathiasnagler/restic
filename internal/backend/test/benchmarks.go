@@ -43,9 +43,9 @@ func (s *Suite) BenchmarkLoadFile(t *testing.B) {
 
 	for i := 0; i < t.N; i++ {
 		var n int
-		err := be.Load(context.TODO(), handle, 0, 0, func(rd io.Reader) (err error) {
-			n, err = io.ReadFull(rd, buf)
-			return err
+		err := be.Load(context.TODO(), handle, 0, 0, func(rd io.Reader) (ierr error) {
+			n, ierr = io.ReadFull(rd, buf)
+			return ierr
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -80,9 +80,9 @@ func (s *Suite) BenchmarkLoadPartialFile(t *testing.B) {
 
 	for i := 0; i < t.N; i++ {
 		var n int
-		err := be.Load(context.TODO(), handle, testLength, 0, func(rd io.Reader) (err error) {
-			n, err = io.ReadFull(rd, buf)
-			return err
+		err := be.Load(context.TODO(), handle, testLength, 0, func(rd io.Reader) (ierr error) {
+			n, ierr = io.ReadFull(rd, buf)
+			return ierr
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -119,9 +119,9 @@ func (s *Suite) BenchmarkLoadPartialFileOffset(t *testing.B) {
 
 	for i := 0; i < t.N; i++ {
 		var n int
-		err := be.Load(context.TODO(), handle, testLength, int64(testOffset), func(rd io.Reader) (err error) {
-			n, err = io.ReadFull(rd, buf)
-			return err
+		err := be.Load(context.TODO(), handle, testLength, int64(testOffset), func(rd io.Reader) (ierr error) {
+			n, ierr = io.ReadFull(rd, buf)
+			return ierr
 		})
 		if err != nil {
 			t.Fatal(err)
