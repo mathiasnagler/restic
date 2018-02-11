@@ -23,11 +23,15 @@ type Backend interface {
 	// Save stores the data in the backend under the given handle.
 	Save(ctx context.Context, h Handle, rd io.Reader) error
 
-	// Load returns a reader that yields the contents of the file at h at the
+	// Load runs fn with a reader that yields the contents of the file at h at the
 	// given offset. If length is larger than zero, only a portion of the file
-	// is returned. rd must be closed after use. If an error is returned, the
-	// ReadCloser must be nil.
-	Load(ctx context.Context, h Handle, length int, offset int64, consumer func(rd io.Reader) error) error
+	// is read.
+	//
+	// The function fn may be called multiple times during the same Load invocation
+	// and therefore must be idempotent.
+	//
+	// Implementations are encouraged to use backend.DefaultLoad
+	Load(ctx context.Context, h Handle, length int, offset int64, fn func(rd io.Reader) error) error
 
 	// Stat returns information about the File identified by h.
 	Stat(ctx context.Context, h Handle) (FileInfo, error)
@@ -54,24 +58,4 @@ type Backend interface {
 type FileInfo struct {
 	Size int64
 	Name string
-}
-
-// LoaderBackend TBD
-type LoaderBackend interface {
-	OpenReader(ctx context.Context, h Handle, length int, offset int64) (io.ReadCloser, error)
-}
-
-// DefaultLoaderBackend TBD
-type DefaultLoaderBackend struct {
-	LoaderBackend
-}
-
-// Load implements Backend using lower-level OpenReader func
-func (be *DefaultLoaderBackend) Load(ctx context.Context, h Handle, length int, offset int64, consumer func(rd io.Reader) error) error {
-	rd, err := be.OpenReader(ctx, h, length, offset)
-	if err != nil {
-		return err
-	}
-	defer rd.Close() // ignore errors closing the reader
-	return consumer(rd)
 }

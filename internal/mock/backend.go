@@ -20,13 +20,11 @@ type Backend struct {
 	TestFn       func(ctx context.Context, h restic.Handle) (bool, error)
 	DeleteFn     func(ctx context.Context) error
 	LocationFn   func() string
-	restic.DefaultLoaderBackend
 }
 
 // NewBackend returns new mock Backend instance
 func NewBackend() *Backend {
 	be := &Backend{}
-	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 	return be
 }
 
@@ -66,8 +64,22 @@ func (m *Backend) Save(ctx context.Context, h restic.Handle, rd io.Reader) error
 	return m.SaveFn(ctx, h, rd)
 }
 
-// OpenReader loads data from the backend.
-func (m *Backend) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+// Load runs fn with a reader that yields the contents of the file at h at the
+// given offset.
+func (m *Backend) Load(ctx context.Context, h restic.Handle, length int, offset int64, fn func(rd io.Reader) error) error {
+	rd, err := m.openReader(ctx, h, length, offset)
+	if err != nil {
+		return err
+	}
+	err = fn(rd)
+	if err != nil {
+		rd.Close() // ignore secondary errors closing the reader
+		return err
+	}
+	return rd.Close()
+}
+
+func (m *Backend) openReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	if m.OpenReaderFn == nil {
 		return nil, errors.New("not implemented")
 	}

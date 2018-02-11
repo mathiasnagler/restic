@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"sync"
 
+	"github.com/restic/restic/internal/backend"
 	"github.com/restic/restic/internal/errors"
 	"github.com/restic/restic/internal/restic"
 
@@ -25,7 +26,6 @@ var errNotFound = errors.New("not found")
 type MemoryBackend struct {
 	data memMap
 	m    sync.Mutex
-	restic.DefaultLoaderBackend
 }
 
 // New returns a new backend that saves all data in a map in memory.
@@ -33,7 +33,6 @@ func New() *MemoryBackend {
 	be := &MemoryBackend{
 		data: make(memMap),
 	}
-	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 
 	debug.Log("created new memory backend")
 
@@ -87,10 +86,13 @@ func (be *MemoryBackend) Save(ctx context.Context, h restic.Handle, rd io.Reader
 	return nil
 }
 
-// OpenReader returns a reader that yields the contents of the file at h at the
-// given offset. If length is nonzero, only a portion of the file is
-// returned. rd must be closed after use.
-func (be *MemoryBackend) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+// Load runs fn with a reader that yields the contents of the file at h at the
+// given offset.
+func (be *MemoryBackend) Load(ctx context.Context, h restic.Handle, length int, offset int64, fn func(rd io.Reader) error) error {
+	return backend.DefaultLoad(ctx, h, length, offset, be.openReader, fn)
+}
+
+func (be *MemoryBackend) openReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	if err := h.Valid(); err != nil {
 		return nil, err
 	}

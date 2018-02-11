@@ -26,7 +26,6 @@ type beSwift struct {
 	container string // Container name
 	prefix    string // Prefix of object names in the container
 	backend.Layout
-	restic.DefaultLoaderBackend
 }
 
 // ensure statically that *beSwift implements restic.Backend.
@@ -68,7 +67,6 @@ func Open(cfg Config, rt http.RoundTripper) (restic.Backend, error) {
 			Join: path.Join,
 		},
 	}
-	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 
 	// Authenticate if needed
 	if !be.conn.Authenticated() {
@@ -111,10 +109,13 @@ func (be *beSwift) Location() string {
 	return be.container
 }
 
-// OpenReader returns a reader that yields the contents of the file at h at the
-// given offset. If length is nonzero, only a portion of the file is
-// returned. rd must be closed after use.
-func (be *beSwift) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+// Load runs fn with a reader that yields the contents of the file at h at the
+// given offset.
+func (be *beSwift) Load(ctx context.Context, h restic.Handle, length int, offset int64, fn func(rd io.Reader) error) error {
+	return backend.DefaultLoad(ctx, h, length, offset, be.openReader, fn)
+}
+
+func (be *beSwift) openReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	debug.Log("Load %v, length %v, offset %v", h, length, offset)
 	if err := h.Valid(); err != nil {
 		return nil, err

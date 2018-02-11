@@ -28,7 +28,6 @@ type restBackend struct {
 	sem    *backend.Semaphore
 	client *http.Client
 	backend.Layout
-	restic.DefaultLoaderBackend
 }
 
 const (
@@ -57,7 +56,6 @@ func Open(cfg Config, rt http.RoundTripper) (*restBackend, error) {
 		Layout: &backend.RESTLayout{URL: url, Join: path.Join},
 		sem:    sem,
 	}
-	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 
 	return be, nil
 }
@@ -168,10 +166,13 @@ func (b *restBackend) IsNotExist(err error) bool {
 	return ok
 }
 
-// OpenReader returns a reader that yields the contents of the file at h at the
-// given offset. If length is nonzero, only a portion of the file is
-// returned. rd must be closed after use.
-func (b *restBackend) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+// Load runs fn with a reader that yields the contents of the file at h at the
+// given offset.
+func (b *restBackend) Load(ctx context.Context, h restic.Handle, length int, offset int64, fn func(rd io.Reader) error) error {
+	return backend.DefaultLoad(ctx, h, length, offset, b.openReader, fn)
+}
+
+func (b *restBackend) openReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	debug.Log("Load %v, length %v, offset %v", h, length, offset)
 	if err := h.Valid(); err != nil {
 		return nil, err

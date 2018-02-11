@@ -23,7 +23,6 @@ type b2Backend struct {
 	listMaxItems int
 	backend.Layout
 	sem *backend.Semaphore
-	restic.DefaultLoaderBackend
 }
 
 const defaultListMaxItems = 1000
@@ -74,7 +73,6 @@ func Open(ctx context.Context, cfg Config, rt http.RoundTripper) (restic.Backend
 		listMaxItems: defaultListMaxItems,
 		sem:          sem,
 	}
-	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 
 	return be, nil
 }
@@ -116,7 +114,6 @@ func Create(ctx context.Context, cfg Config, rt http.RoundTripper) (restic.Backe
 		listMaxItems: defaultListMaxItems,
 		sem:          sem,
 	}
-	be.DefaultLoaderBackend = restic.DefaultLoaderBackend{LoaderBackend: be}
 
 	present, err := be.Test(ctx, restic.Handle{Type: restic.ConfigFile})
 	if err != nil {
@@ -145,9 +142,13 @@ func (be *b2Backend) IsNotExist(err error) bool {
 	return b2.IsNotExist(errors.Cause(err))
 }
 
-// OpenReader returns the data stored in the backend for h at the given offset
-// and saves it in p. Load has the same semantics as io.ReaderAt.
-func (be *b2Backend) OpenReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+// Load runs fn with a reader that yields the contents of the file at h at the
+// given offset.
+func (be *b2Backend) Load(ctx context.Context, h restic.Handle, length int, offset int64, fn func(rd io.Reader) error) error {
+	return backend.DefaultLoad(ctx, h, length, offset, be.openReader, fn)
+}
+
+func (be *b2Backend) openReader(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
 	debug.Log("Load %v, length %v, offset %v from %v", h, length, offset, be.Filename(h))
 	if err := h.Valid(); err != nil {
 		return nil, err
