@@ -137,12 +137,16 @@ func (b *Backend) cacheFile(ctx context.Context, h restic.Handle) error {
 // back to the backend if that fails.
 func (b *Backend) loadFromCacheOrDelegate(ctx context.Context, h restic.Handle, length int, offset int64, consumer func(rd io.Reader) error) error {
 	rd, err := b.Cache.Load(h, length, offset)
-	if err == nil {
-		defer rd.Close()
-		return consumer(rd)
+	if err != nil {
+		return b.Backend.Load(ctx, h, length, offset, consumer)
 	}
 
-	return b.Backend.Load(ctx, h, length, offset, consumer)
+	err = consumer(rd)
+	if err != nil {
+		rd.Close() // ignore secondary errors
+		return err
+	}
+	return rd.Close()
 }
 
 // Load loads a file from the cache or the backend.
@@ -161,8 +165,12 @@ func (b *Backend) Load(ctx context.Context, h restic.Handle, length int, offset 
 		debug.Log("Load(%v, %v, %v) from cache", h, length, offset)
 		rd, err := b.Cache.Load(h, length, offset)
 		if err == nil {
-			defer rd.Close()
-			return consumer(rd)
+			err = consumer(rd)
+			if err != nil {
+				rd.Close() // ignore secondary errors
+				return err
+			}
+			return rd.Close()
 		}
 		debug.Log("error loading %v from cache: %v", h, err)
 	}
@@ -199,8 +207,12 @@ func (b *Backend) Load(ctx context.Context, h restic.Handle, length int, offset 
 		if err != nil {
 			return err
 		}
-		defer rd.Close()
-		return consumer(rd)
+		err = consumer(rd)
+		if err != nil {
+			rd.Close() // ignore secondary errors
+			return err
+		}
+		return rd.Close()
 	}
 
 	debug.Log("error caching %v: %v, falling back to backend", h, err)

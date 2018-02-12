@@ -89,8 +89,7 @@ func startClient(program string, args ...string) (*SFTP, error) {
 		return nil, errors.Wrap(err, "bg")
 	}
 
-	be := &SFTP{c: client, cmd: cmd, result: ch}
-	return be, nil
+	return &SFTP{c: client, cmd: cmd, result: ch}, nil
 }
 
 // clientError returns an error if the client has exited. Otherwise, nil is

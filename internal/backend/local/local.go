@@ -52,8 +52,7 @@ func Open(cfg Config) (*Local, error) {
 		return nil, err
 	}
 
-	be := &Local{Config: cfg, Layout: l}
-	return be, nil
+	return &Local{Config: cfg, Layout: l}, nil
 }
 
 // Create creates all the necessary files and directories for a new local
