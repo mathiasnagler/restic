@@ -147,6 +147,16 @@ func (s *Suite) TestLoad(t *testing.T) {
 		t.Fatalf("Load() returned no error for negative offset!")
 	}
 
+	err = b.Load(context.TODO(), handle, 0, 0, func(rd io.Reader) error {
+		return errors.Errorf("deliberate error")
+	})
+	if err == nil {
+		t.Fatalf("Load() did not propagate consumer error!")
+	}
+	if err.Error() != "deliberate error" {
+		t.Fatalf("Load() did not correctly propagate consumer error!")
+	}
+
 	loadTests := 50
 	if s.MinimalData {
 		loadTests = 10
