@@ -124,13 +124,14 @@ func TestBackendListRetry(t *testing.T) {
 	test.Equals(t, []string{ID1, ID2}, listed) // assert no duplicate files
 }
 
-type funnyReader struct {
+// failingReader returns an error after reading limit number of bytes
+type failingReader struct {
 	data  []byte
 	pos   int
 	limit int
 }
 
-func (r funnyReader) Read(p []byte) (n int, err error) {
+func (r failingReader) Read(p []byte) (n int, err error) {
 	i := 0
 	for ; i < len(p) && i+r.pos < r.limit; i++ {
 		p[i] = r.data[r.pos+i]
@@ -141,10 +142,11 @@ func (r funnyReader) Read(p []byte) (n int, err error) {
 	}
 	return i, nil
 }
-func (r funnyReader) Close() error {
+func (r failingReader) Close() error {
 	return nil
 }
 
+// closingReader adapts io.Reader to io.ReadCloser interface
 type closingReader struct {
 	rd io.Reader
 }
@@ -163,11 +165,12 @@ func TestBackendLoadRetry(t *testing.T) {
 
 	be := mock.NewBackend()
 	be.OpenReaderFn = func(ctx context.Context, h restic.Handle, length int, offset int64) (io.ReadCloser, error) {
+		// returns failing reader on first invocation, good reader on subsequent invocations
 		attempt++
 		if attempt > 1 {
 			return closingReader{rd: bytes.NewReader(data)}, nil
 		}
-		return funnyReader{data: data, limit: limit}, nil
+		return failingReader{data: data, limit: limit}, nil
 	}
 
 	retryBackend := RetryBackend{
