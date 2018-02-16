@@ -11,6 +11,9 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"os"
+	"path/filepath"
+	"encoding/json"
 
 	"github.com/restic/restic/internal/backend"
 	"github.com/restic/restic/internal/debug"
@@ -252,28 +255,79 @@ type gdriveBackend struct {
 var _ restic.Backend = &gdriveBackend{}
 
 func gdriveNewService(jsonKeyPath string, rt http.RoundTripper) (*drive.Service, error) {
-	// TODO consider using google's default credentials
-	//      https://developers.google.com/accounts/docs/application-default-credentials
 
 	raw, err := ioutil.ReadFile(jsonKeyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	conf, err := google.JWTConfigFromJSON(raw, drive.DriveFileScope, drive.DriveMetadataScope)
+	config, err := google.ConfigFromJSON(raw, drive.DriveFileScope)
 	if err != nil {
 		return nil, err
 	}
 
-	// create authenticating http client using provided http.RoundTripper
-	client := conf.Client(context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{Transport: rt}))
+	dir, _ := path.Split(jsonKeyPath)
+	tokenCachePath := filepath.Join(dir, "restic-gdrive-tokencache.json")
+
+	client, err := getClient(context.Background(), config, tokenCachePath)
+	if err != nil {
+		return nil, err
+	}
 
 	service, err := drive.New(client)
+
 	if err != nil {
 		return nil, err
 	}
 
 	return service, nil
+}
+
+func getClient(ctx context.Context, config *oauth2.Config, tokenCachePath string) (*http.Client, error) {
+	tok, err := tokenFromFile(tokenCachePath)
+	if err != nil {
+		tok, err = getTokenFromWeb(config)
+		if err != nil {
+			return nil, err
+		}
+		saveToken(tokenCachePath, tok)
+	}
+	return config.Client(ctx, tok), nil
+}
+
+func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("Go to the following link in your browser then type the "+
+		"authorization code: \n%v\n", authURL)
+
+	var code string
+	if _, err := fmt.Scan(&code); err != nil {
+		return nil, err
+	}
+
+	tok, err := config.Exchange(oauth2.NoContext, code)
+	if err != nil {
+		return nil, err
+	}
+	return tok, nil
+}
+
+func tokenFromFile(file string) (*oauth2.Token, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	t := &oauth2.Token{}
+	err = json.NewDecoder(f).Decode(t)
+	defer f.Close()
+	return t, err
+}
+
+func saveToken(file string, token *oauth2.Token) {
+  fmt.Printf("Saving credential file to: %s\n", file)
+  f, _ := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+  defer f.Close()
+  json.NewEncoder(f).Encode(token)
 }
 
 func getOrCreateFolder(ctx context.Context, service *drive.Service, dirs map[string]string, path string, createMissing bool) (string, error) {
